@@ -1,12 +1,20 @@
 # views.py
-from rest_framework import status, permissions
-from rest_framework.response import Response
-from rest_framework.views import APIView
-from elevator_api.serializers import *
-from elevator_api.models import Elevator, ElevatorRequest
-from rest_framework.decorators import action
 from datetime import datetime
 from django.utils import timezone
+
+from rest_framework import permissions, status
+from rest_framework.decorators import action
+from rest_framework.response import Response
+from rest_framework.views import APIView
+
+from elevator_api.models import Elevator, ElevatorRequest
+from elevator_api.serializers import *
+
+from elevator_api.services import (
+    check_if_elevator_is_under_maintenance,
+    fetch_all_incomplete_requests_for_elevator,
+    get_elevator_flow,
+)
 
 
 class ElevatorInitializationView(APIView):
@@ -117,7 +125,9 @@ class ElevatorDoorOpenClose(APIView):
             elevator_id = serializer.validated_data.get('elevator_id')
             door_open_close_request = serializer.validated_data.get('door_open_close_request')
             get_elevator = Elevator.objects.get(id=elevator_id)
-            if get_elevator.operational:
+            if check_if_elevator_is_under_maintenance(elevator_id):
+                return Response("Elevator is under maintenance", status=status.HTTP_200_OK)
+            else:
                 if get_elevator.door_open == True and door_open_close_request == True:
                     return Response("Door already open", status=status.HTTP_200_OK)
                 elif get_elevator.door_open == False and door_open_close_request == False:
@@ -128,8 +138,6 @@ class ElevatorDoorOpenClose(APIView):
                     return Response(
                         ElevatorSerialzer(get_elevator, many=False).data, status=status.HTTP_200_OK
                     )
-            else:
-                return Response("Elevator is under maintenance", status=status.HTTP_200_OK)
         else:
             return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
@@ -143,12 +151,12 @@ class ElevatorMaintenanceToggle(APIView):
         serializer = DoorMaintenanceSerializer(data=request.data)
         if serializer.is_valid():
             elevator_id = serializer.validated_data.get('elevator_id')
-            door_maintenance_request = serializer.validated_data.get('door_maintenance_request')
+            door_maintenance_request = serializer.validated_data.get('elevator_maintenance_request')
             get_elevator = Elevator.objects.get(id=elevator_id)
             if get_elevator.operational == True and door_maintenance_request == False:
                 return Response("Elevator already operational", status=status.HTTP_200_OK)
             elif get_elevator.operational == False and door_maintenance_request == True:
-                return Response("Door already under maintenance", status=status.HTTP_200_OK)
+                return Response("Elevator already under maintenance", status=status.HTTP_200_OK)
             else:
                 get_elevator.operational = not door_maintenance_request
                 get_elevator.save()
@@ -160,11 +168,6 @@ class ElevatorMaintenanceToggle(APIView):
             return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
 
-from django.db.models import F, Case, When, Value, BooleanField
-from django.db.models import Sum, ExpressionWrapper, FloatField
-from django.db.models.functions import Sign
-
-
 class FetchNextDestinationFloor(APIView):
     permission_classes = [
         permissions.AllowAny,
@@ -174,47 +177,10 @@ class FetchNextDestinationFloor(APIView):
         serializer = ElevatorIDSerializer(data=request.data)
         if serializer.is_valid():
             elevator_id = serializer.validated_data.get('elevator_id')
-            fetch_all_requests = (
-                ElevatorRequest.objects.filter(elevator__id=elevator_id, completed=False)
-                .annotate(
-                    direction=Case(  # marking true for up and false for down movement of elevator
-                        When(from_floor__lt=F('destination_floor'), then=True),
-                        default=False,
-                        output_field=BooleanField(),
-                    )
-                )
-                .order_by('timestamp')
-            )
-            # select initial flow#
-            if fetch_all_requests:
-                intial_flow = fetch_all_requests.first().direction
-                elevator_flow = []
-                split_up = fetch_all_requests.filter(direction=True)
-                split_down = fetch_all_requests.filter(direction=False)
-                split_up_list = []
-                split_down_list = []
-
-                if intial_flow:
-                    for i in split_up:
-                        split_up_list.append(i.from_floor.floor_number + 1)
-                        split_up_list.append(i.destination_floor.floor_number + 1)
-                    split_up_list = list(set(split_up_list))
-                    for i in split_down:
-                        split_down_list.append(i.from_floor.floor_number + 1)
-                        split_down_list.append(i.destination_floor.floor_number + 1)
-                    split_down_list = list(set(split_down_list))
-                    elevator_flow = sorted(split_up_list) + sorted(split_down_list, reverse=True)
-                else:
-                    for i in split_down:
-                        split_down_list.append(i.from_floor)
-                        split_down_list.append(i.destination_floor)
-                    split_down_list = list(set(split_down_list))
-                    for i in split_up:
-                        split_up_list.append(i.from_floor)
-                        split_up_list.append(i.destination_floor)
-                    split_up_list = list(set(split_up_list))
-                    elevator_flow = sorted(split_down_list, reverse=True), sorted(split_up_list)
-
+            if check_if_elevator_is_under_maintenance(elevator_id):
+                return Response({'error': "Elevator Under Maintenance"})
+            elevator_flow = get_elevator_flow(elevator_id)
+            if elevator_flow:
                 return Response(
                     {
                         'next_destination_floor': elevator_flow[0]
@@ -227,3 +193,27 @@ class FetchNextDestinationFloor(APIView):
                 return Response('No available requests for this elevator')
         else:
             return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+
+
+class FetchElevatorDirection(APIView):
+    permission_classes = [
+        permissions.AllowAny,
+    ]
+
+    def get(self, request):
+        serializer = ElevatorIDSerializer(data=request.data)
+        if serializer.is_valid():
+            elevator_id = serializer.validated_data.get('elevator_id')
+            if check_if_elevator_is_under_maintenance(elevator_id):
+                return Response({'error': "Elevator Under Maintenance"})
+            all_incomplete_requests = fetch_all_incomplete_requests_for_elevator(elevator_id)
+            if all_incomplete_requests:
+                return Response(
+                    {
+                        'direction': "Upwards"
+                        if all_incomplete_requests.first().direction
+                        else "Downwards"
+                    }
+                )
+            else:
+                return Response("No direction for the elevator, since the elevator is not moving.")
