@@ -100,13 +100,6 @@ class CreateRequestSerializer(serializers.Serializer):
     destination_floor = serializers.IntegerField()
     from_floor = serializers.IntegerField()
 
-    def validate_elevator_system(self, value):
-        try:
-            elevator_system = ElevatorSystem.objects.get(id=value)
-        except ElevatorSystem.DoesNotExist:
-            raise serializers.ValidationError("Invalid Elevator System")
-        return value
-
     def validate(self, data):
         validated_data = super().validate(data)
         elevator_system_id = data.get('elevator_system')
