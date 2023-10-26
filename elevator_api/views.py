@@ -163,16 +163,18 @@ class ElevatorMaintenanceToggle(APIView):
         if serializer.is_valid():
             elevator_number = serializer.validated_data.get('elevator_number')
             elevator_system = serializer.validated_data.get('elevator_system')
-            door_maintenance_request = serializer.validated_data.get('elevator_maintenance_request')
+            elevator_maintenance_request = serializer.validated_data.get(
+                'elevator_maintenance_request'
+            )
             get_elevator = Elevator.objects.get(
                 elevator_number=elevator_number, elevatorsystem=elevator_system
             )
-            if get_elevator.operational == True and door_maintenance_request == False:
+            if get_elevator.operational == True and elevator_maintenance_request == False:
                 return Response("Elevator already operational", status=status.HTTP_200_OK)
-            elif get_elevator.operational == False and door_maintenance_request == True:
+            elif get_elevator.operational == False and elevator_maintenance_request == True:
                 return Response("Elevator already under maintenance", status=status.HTTP_200_OK)
             else:
-                get_elevator.operational = not door_maintenance_request
+                get_elevator.operational = not elevator_maintenance_request
                 get_elevator.save()
                 return Response(
                     ElevatorSerialzer(get_elevator, many=False).data, status=status.HTTP_200_OK

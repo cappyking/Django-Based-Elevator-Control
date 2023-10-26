@@ -22,7 +22,9 @@ class ElevatorIDSerializer(serializers.Serializer):
                 elevator_number=elevator_number, elevatorsystem=elevator_system
             )
         except Elevator.DoesNotExist:
-            raise serializers.ValidationError("Invalid Elevator ID")
+            raise serializers.ValidationError(
+                "Elevator Number is either invalid or not associated with this Elevator System"
+            )
 
         return data
 
@@ -51,23 +53,28 @@ class PendingRequestsSerializer(serializers.ModelSerializer):
 
 class DoorOpenCloseSerializer(serializers.Serializer):
     door_open = serializers.BooleanField()
-    elevator_number = serializers.IntegerField(required=True)
-    elevator_system = serializers.IntegerField(required=True)
+    elevator_number = serializers.IntegerField()
+    elevator_system = serializers.IntegerField()
 
     def validate(self, data):
-        validated_data = super().validate(data)
         elevator_number = data.get('elevator_number')
         elevator_system = data.get('elevator_system')
-        # if door_open is None:
-        #     raise serializers.ValidationError("door_open is a mandatory field")
+
+        # Extra validation for managing form-data boolean based input
+        if self.initial_data.get('door_open') is None:
+            raise serializers.ValidationError("door_open is a mandatory field")
+
+        # Check if the elevator one is trying to reach is valid
         try:
             elevator = Elevator.objects.get(
                 elevator_number=elevator_number, elevatorsystem=elevator_system
             )
         except Elevator.DoesNotExist:
-            raise serializers.ValidationError("Invalid Elevator ID")
+            raise serializers.ValidationError(
+                "Elevator Number is either invalid or not associated with this Elevator System"
+            )
 
-        return validated_data
+        return data
 
 
 class ElevatorMaintenanceSerializer(serializers.Serializer):
@@ -77,12 +84,13 @@ class ElevatorMaintenanceSerializer(serializers.Serializer):
 
     def validate(self, data):
         validated_data = super().validate(data)
-        elevator_number = data.get('elevator_number')
-        elevator_system = data.get('elevator_system')
-        elevator_maintenance_request = self.initial_data.get("elevator_maintenance_request")
+        elevator_number = validated_data.get('elevator_number')
+        elevator_system = validated_data.get('elevator_system')
 
-        if elevator_maintenance_request is None:
+        # Extra validation for managing form-data boolean based input
+        if self.initial_data.get('elevator_maintenance_request') is None:
             raise serializers.ValidationError("elevator_maintenance_request is a mandatory field")
+
         try:
             elevator = Elevator.objects.get(
                 elevator_number=elevator_number, elevatorsystem=elevator_system
@@ -99,13 +107,6 @@ class CreateRequestSerializer(serializers.Serializer):
     elevator_number = serializers.IntegerField()
     destination_floor = serializers.IntegerField()
     from_floor = serializers.IntegerField()
-
-    def validate_elevator_system(self, value):
-        try:
-            elevator_system = ElevatorSystem.objects.get(id=value)
-        except ElevatorSystem.DoesNotExist:
-            raise serializers.ValidationError("Invalid Elevator System")
-        return value
 
     def validate(self, data):
         validated_data = super().validate(data)
@@ -124,7 +125,9 @@ class CreateRequestSerializer(serializers.Serializer):
                 elevatorsystem=elevator_system_id, elevator_number=elevator_number
             )
         except Elevator.DoesNotExist:
-            raise serializers.ValidationError("Invalid Elevator ID")
+            raise serializers.ValidationError(
+                "Elevator Number is either invalid or not associated with this Elevator System"
+            )
 
         try:
             # Check if the floor exists within the specified elevator_system
