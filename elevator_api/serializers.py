@@ -10,14 +10,21 @@ class ElevatorInitializationSerializer(serializers.Serializer):
 
 
 class ElevatorIDSerializer(serializers.Serializer):
-    elevator_id = serializers.IntegerField()
+    elevator_number = serializers.IntegerField()
+    elevator_system = serializers.IntegerField()
 
-    def validate_elevator_id(self, value):
+    def validate(self, data):
+        elevator_number = data.get('elevator_number')
+        elevator_system = data.get('elevator_system')
+
         try:
-            elevator = Elevator.objects.get(id=value)
+            elevator = Elevator.objects.get(
+                elevator_number=elevator_number, elevatorsystem=elevator_system
+            )
         except Elevator.DoesNotExist:
             raise serializers.ValidationError("Invalid Elevator ID")
-        return value
+
+        return data
 
 
 class ElevatorSerialzer(serializers.ModelSerializer):
@@ -27,38 +34,69 @@ class ElevatorSerialzer(serializers.ModelSerializer):
 
 
 class PendingRequestsSerializer(serializers.ModelSerializer):
+    elevator_number = serializers.ReadOnlyField(source='elevator.elevator_number')
+    from_floor_number = serializers.ReadOnlyField(source='from_floor.floor_number')
+    destination_floor_number = serializers.ReadOnlyField(source='destination_floor.floor_number')
+
     class Meta:
         model = ElevatorRequest
-        fields = '__all__'
+        fields = [
+            'elevator_number',
+            'from_floor_number',
+            'destination_floor_number',
+            'timestamp',
+            'completed',
+        ]
 
 
 class DoorOpenCloseSerializer(serializers.Serializer):
-    door_open_close_request = serializers.BooleanField()
-    elevator_id = serializers.IntegerField()
+    door_open = serializers.BooleanField()
+    elevator_number = serializers.IntegerField(required=True)
+    elevator_system = serializers.IntegerField(required=True)
 
-    def validate_elevator_system(self, value):
+    def validate(self, data):
+        validated_data = super().validate(data)
+        elevator_number = data.get('elevator_number')
+        elevator_system = data.get('elevator_system')
+        # if door_open is None:
+        #     raise serializers.ValidationError("door_open is a mandatory field")
         try:
-            elevator_system = ElevatorSystem.objects.get(id=value)
-        except ElevatorSystem.DoesNotExist:
-            raise serializers.ValidationError("Invalid Elevator System ID")
-        return value
+            elevator = Elevator.objects.get(
+                elevator_number=elevator_number, elevatorsystem=elevator_system
+            )
+        except Elevator.DoesNotExist:
+            raise serializers.ValidationError("Invalid Elevator ID")
+
+        return validated_data
 
 
-class DoorMaintenanceSerializer(serializers.Serializer):
-    door_maintenance_request = serializers.BooleanField()
-    elevator_id = serializers.IntegerField()
+class ElevatorMaintenanceSerializer(serializers.Serializer):
+    elevator_maintenance_request = serializers.BooleanField()
+    elevator_number = serializers.IntegerField()
+    elevator_system = serializers.IntegerField()
 
-    def validate_elevator_system(self, value):
+    def validate(self, data):
+        validated_data = super().validate(data)
+        elevator_number = data.get('elevator_number')
+        elevator_system = data.get('elevator_system')
+        elevator_maintenance_request = self.initial_data.get("elevator_maintenance_request")
+
+        if elevator_maintenance_request is None:
+            raise serializers.ValidationError("elevator_maintenance_request is a mandatory field")
         try:
-            elevator_system = ElevatorSystem.objects.get(id=value)
-        except ElevatorSystem.DoesNotExist:
-            raise serializers.ValidationError("Invalid Elevator System ID")
-        return value
+            elevator = Elevator.objects.get(
+                elevator_number=elevator_number, elevatorsystem=elevator_system
+            )
+        except Elevator.DoesNotExist:
+            raise serializers.ValidationError(
+                "Elevator Number is either invalid or not associated with this Elevator System"
+            )
+        return validated_data
 
 
 class CreateRequestSerializer(serializers.Serializer):
     elevator_system = serializers.IntegerField()
-    elevator_id = serializers.IntegerField()
+    elevator_number = serializers.IntegerField()
     destination_floor = serializers.IntegerField()
     from_floor = serializers.IntegerField()
 
@@ -69,27 +107,43 @@ class CreateRequestSerializer(serializers.Serializer):
             raise serializers.ValidationError("Invalid Elevator System")
         return value
 
-    def validate_elevator_id(self, value):
+    def validate(self, data):
+        validated_data = super().validate(data)
+        elevator_system_id = data.get('elevator_system')
+        elevator_number = data.get('elevator_number')
+        destination_floor = data.get('destination_floor')
+        from_floor = data.get('from_floor')
+
         try:
-            elevator = Elevator.objects.get(id=value)
+            elevator_system = ElevatorSystem.objects.get(id=elevator_system_id)
+        except ElevatorSystem.DoesNotExist:
+            raise serializers.ValidationError("Invalid Elevator System")
+
+        try:
+            elevator = Elevator.objects.get(
+                elevatorsystem=elevator_system_id, elevator_number=elevator_number
+            )
         except Elevator.DoesNotExist:
             raise serializers.ValidationError("Invalid Elevator ID")
-        return value
 
-    def validate_destination_floor(self, value):
-        elevator_system_id = self.initial_data.get('elevator_system')
         try:
             # Check if the floor exists within the specified elevator_system
-            floor = Floor.objects.get(floor_number=value - 1, elevatorsystem=elevator_system_id)
+            floor = Floor.objects.get(
+                floor_number=destination_floor, elevatorsystem=elevator_system_id
+            )
         except Floor.DoesNotExist:
             raise serializers.ValidationError("Invalid Destination Floor")
-        return value
 
-    def validate_from_floor(self, value):
-        elevator_system_id = self.initial_data.get('elevator_system')
         try:
             # Check if the floor exists within the specified elevator_system
-            floor = Floor.objects.get(floor_number=value - 1, elevatorsystem=elevator_system_id)
+            floor = Floor.objects.get(floor_number=from_floor, elevatorsystem=elevator_system_id)
         except Floor.DoesNotExist:
             raise serializers.ValidationError("Invalid From Floor")
-        return value
+
+        return validated_data
+
+
+class FloorSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = Floor
+        fields = "__all__"

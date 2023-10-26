@@ -6,6 +6,7 @@ from .views import (
     ElevatorDoorOpenClose,
     ElevatorMaintenanceToggle,
     FetchNextDestinationFloor,
+    FetchElevatorDirection,
 )
 
 urlpatterns = [
@@ -18,4 +19,5 @@ urlpatterns = [
     path('toggle-door/', ElevatorDoorOpenClose.as_view(), name='toogle-door'),
     path('toggle-maintenance/', ElevatorMaintenanceToggle.as_view(), name='toogle-maintenance'),
     path('next-destination/', FetchNextDestinationFloor.as_view(), name='next-destination'),
+    path('get-direction/', FetchElevatorDirection.as_view(), name='get-direction'),
 ]

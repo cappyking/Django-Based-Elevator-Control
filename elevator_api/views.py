@@ -33,24 +33,24 @@ class ElevatorInitializationView(APIView):
             current_datetime = datetime.now(timezone.get_current_timezone()).strftime(
                 "%Y-%m-%d %H:%M:%S"
             )
-            total_existing_elevators = Elevator.objects.all().count()
             elevators = []
-
-            for i in range(num_elevators):
-                elevator = Elevator(
-                    name=f"Elevator {total_existing_elevators + i + 1} | Elevator System {name} |Created at {current_datetime}"
-                )
-                elevator.save()
-                elevators.append(elevator)
 
             # Create an ElevatorSystem instance
             name = str(name) + f" | Created at {current_datetime}"
             elevator_system = ElevatorSystem.objects.create(name=name)
 
+            for i in range(num_elevators):
+                elevator = Elevator(
+                    name=f"Elevator {i + 1} | Elevator System {name} |Created at {current_datetime}",
+                    elevator_number=i + 1,
+                )
+                elevator.save()
+                elevators.append(elevator)
+
             # Create and associate floor instances
             floors = []
             for floor_number in range(floor_numbers):
-                floor = Floor.objects.create(floor_number=floor_number)
+                floor = Floor.objects.create(floor_number=floor_number + 1)
                 floors.append(floor)
 
             elevator_system.floors.set(floors)
@@ -58,11 +58,13 @@ class ElevatorInitializationView(APIView):
 
             all_elevators = Elevator.objects.all()
             elevator_serializer = ElevatorSerialzer(elevators, many=True)
+            floor_serializer = FloorSerializer(floors, many=True)
 
             return Response(
                 {
                     'message': f'{num_elevators} elevators have been initialized on floor 0 and associated with the elevator system: {elevator_system} with {floor_numbers} floors.',
                     'elevators': elevator_serializer.data,
+                    "floors": floor_serializer.data,
                 },
                 status=status.HTTP_201_CREATED,
             )
@@ -77,8 +79,12 @@ class ElevatorRequestsView(APIView):
     def get(self, request):
         integer_serializer = ElevatorIDSerializer(data=request.data)
         if integer_serializer.is_valid():
-            elevator = integer_serializer.validated_data.get('elevator_id')
-            all_pending_requests = ElevatorRequest.objects.filter(elevator=elevator)
+            elevator_number = integer_serializer.validated_data.get('elevator_number')
+            elevator_system = integer_serializer.validated_data.get('elevator_system')
+            current_elevator = Elevator.objects.get(
+                elevator_number=elevator_number, elevatorsystem=elevator_system
+            )
+            all_pending_requests = ElevatorRequest.objects.filter(elevator=current_elevator)
             if all_pending_requests:
                 pending_requests_serializer_data = PendingRequestsSerializer(
                     all_pending_requests, many=True
@@ -95,17 +101,19 @@ class ElevatorRequestsView(APIView):
     def post(self, request):
         serialized_data = CreateRequestSerializer(data=request.data)
         if serialized_data.is_valid():
-            elevator_id = serialized_data.validated_data.get('elevator_id')
+            elevator_number = serialized_data.validated_data.get('elevator_number')
             from_floor = serialized_data.validated_data.get('from_floor')
             destination_floor = serialized_data.validated_data.get('destination_floor')
             elevator_system = serialized_data.validated_data.get('elevator_system')
             elevator_request = ElevatorRequest(
-                elevator=Elevator.objects.get(id=elevator_id),
+                elevator=Elevator.objects.get(
+                    elevator_number=elevator_number, elevatorsystem=elevator_system
+                ),
                 from_floor=Floor.objects.get(
-                    floor_number=from_floor - 1, elevatorsystem=elevator_system
+                    floor_number=from_floor, elevatorsystem=elevator_system
                 ),
                 destination_floor=Floor.objects.get(
-                    floor_number=destination_floor - 1, elevatorsystem=elevator_system
+                    floor_number=destination_floor, elevatorsystem=elevator_system
                 ),
             )
             elevator_request.save()
@@ -122,10 +130,13 @@ class ElevatorDoorOpenClose(APIView):
     def post(self, request):
         serializer = DoorOpenCloseSerializer(data=request.data)
         if serializer.is_valid():
-            elevator_id = serializer.validated_data.get('elevator_id')
-            door_open_close_request = serializer.validated_data.get('door_open_close_request')
-            get_elevator = Elevator.objects.get(id=elevator_id)
-            if check_if_elevator_is_under_maintenance(elevator_id):
+            elevator_number = serializer.validated_data.get('elevator_number')
+            elevator_system = serializer.validated_data.get('elevator_system')
+            door_open_close_request = serializer.validated_data.get('door_open')
+            get_elevator = Elevator.objects.get(
+                elevator_number=elevator_number, elevatorsystem=elevator_system
+            )
+            if not get_elevator.operational:
                 return Response("Elevator is under maintenance", status=status.HTTP_200_OK)
             else:
                 if get_elevator.door_open == True and door_open_close_request == True:
@@ -148,11 +159,14 @@ class ElevatorMaintenanceToggle(APIView):
     ]
 
     def post(self, request):
-        serializer = DoorMaintenanceSerializer(data=request.data)
+        serializer = ElevatorMaintenanceSerializer(data=request.data)
         if serializer.is_valid():
-            elevator_id = serializer.validated_data.get('elevator_id')
+            elevator_number = serializer.validated_data.get('elevator_number')
+            elevator_system = serializer.validated_data.get('elevator_system')
             door_maintenance_request = serializer.validated_data.get('elevator_maintenance_request')
-            get_elevator = Elevator.objects.get(id=elevator_id)
+            get_elevator = Elevator.objects.get(
+                elevator_number=elevator_number, elevatorsystem=elevator_system
+            )
             if get_elevator.operational == True and door_maintenance_request == False:
                 return Response("Elevator already operational", status=status.HTTP_200_OK)
             elif get_elevator.operational == False and door_maintenance_request == True:

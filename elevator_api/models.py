@@ -9,6 +9,16 @@ class ElevatorSystem(models.Model):
     def __str__(self):
         return self.name
 
+    def delete(self, *args, **kwargs):
+        # Delete associated Elevator objects
+        self.elevators.all().delete()
+
+        # Delete associated Floor objects
+        self.floors.all().delete()
+
+        # Perform the standard delete operation
+        super(ElevatorSystem, self).delete()
+
 
 class Elevator(models.Model):
     STATUS_CHOICES = (
@@ -23,6 +33,7 @@ class Elevator(models.Model):
     status = models.CharField(max_length=15, choices=STATUS_CHOICES, default='stopped')
     operational = models.BooleanField(default=True)
     door_open = models.BooleanField(default=False)
+    elevator_number = models.PositiveIntegerField(null=True)
 
     def __str__(self):
         return self.name
