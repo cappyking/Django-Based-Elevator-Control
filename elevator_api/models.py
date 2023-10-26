@@ -3,21 +3,9 @@ from django.db import models
 
 class ElevatorSystem(models.Model):
     name = models.CharField(max_length=50)
-    elevators = models.ManyToManyField('Elevator')
-    floors = models.ManyToManyField('Floor')
 
     def __str__(self):
         return self.name
-
-    def delete(self, *args, **kwargs):
-        # Delete associated Elevator objects
-        self.elevators.all().delete()
-
-        # Delete associated Floor objects
-        self.floors.all().delete()
-
-        # Perform the standard delete operation
-        super(ElevatorSystem, self).delete()
 
 
 class Elevator(models.Model):
@@ -34,6 +22,7 @@ class Elevator(models.Model):
     operational = models.BooleanField(default=True)
     door_open = models.BooleanField(default=False)
     elevator_number = models.PositiveIntegerField(null=True)
+    elevator_system = models.ForeignKey(ElevatorSystem, on_delete=models.CASCADE)
 
     def __str__(self):
         return self.name
@@ -41,6 +30,7 @@ class Elevator(models.Model):
 
 class Floor(models.Model):
     floor_number = models.PositiveIntegerField()
+    elevator_system = models.ForeignKey(ElevatorSystem, on_delete=models.CASCADE)
 
     def __str__(self):
         return f"Floor {self.floor_number}"

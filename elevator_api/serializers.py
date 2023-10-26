@@ -19,7 +19,7 @@ class ElevatorIDSerializer(serializers.Serializer):
 
         try:
             elevator = Elevator.objects.get(
-                elevator_number=elevator_number, elevatorsystem=elevator_system
+                elevator_number=elevator_number, elevator_system__id=elevator_system
             )
         except Elevator.DoesNotExist:
             raise serializers.ValidationError(
@@ -29,7 +29,7 @@ class ElevatorIDSerializer(serializers.Serializer):
         return data
 
 
-class ElevatorSerialzer(serializers.ModelSerializer):
+class ElevatorSerializer(serializers.ModelSerializer):
     class Meta:
         model = Elevator
         fields = '__all__'
@@ -67,7 +67,7 @@ class DoorOpenCloseSerializer(serializers.Serializer):
         # Check if the elevator one is trying to reach is valid
         try:
             elevator = Elevator.objects.get(
-                elevator_number=elevator_number, elevatorsystem=elevator_system
+                elevator_number=elevator_number, elevator_system__id=elevator_system
             )
         except Elevator.DoesNotExist:
             raise serializers.ValidationError(
@@ -93,7 +93,7 @@ class ElevatorMaintenanceSerializer(serializers.Serializer):
 
         try:
             elevator = Elevator.objects.get(
-                elevator_number=elevator_number, elevatorsystem=elevator_system
+                elevator_number=elevator_number, elevator_system__id=elevator_system
             )
         except Elevator.DoesNotExist:
             raise serializers.ValidationError(
@@ -122,7 +122,7 @@ class CreateRequestSerializer(serializers.Serializer):
 
         try:
             elevator = Elevator.objects.get(
-                elevatorsystem=elevator_system_id, elevator_number=elevator_number
+                elevator_system__id=elevator_system_id, elevator_number=elevator_number
             )
         except Elevator.DoesNotExist:
             raise serializers.ValidationError(
@@ -132,14 +132,16 @@ class CreateRequestSerializer(serializers.Serializer):
         try:
             # Check if the floor exists within the specified elevator_system
             floor = Floor.objects.get(
-                floor_number=destination_floor, elevatorsystem=elevator_system_id
+                floor_number=destination_floor, elevator_system__id=elevator_system_id
             )
         except Floor.DoesNotExist:
             raise serializers.ValidationError("Invalid Destination Floor")
 
         try:
             # Check if the floor exists within the specified elevator_system
-            floor = Floor.objects.get(floor_number=from_floor, elevatorsystem=elevator_system_id)
+            floor = Floor.objects.get(
+                floor_number=from_floor, elevator_system_id=elevator_system_id
+            )
         except Floor.DoesNotExist:
             raise serializers.ValidationError("Invalid From Floor")
 

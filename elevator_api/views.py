@@ -38,11 +38,13 @@ class ElevatorInitializationView(APIView):
             # Create an ElevatorSystem instance
             name = str(name) + f" | Created at {current_datetime}"
             elevator_system = ElevatorSystem.objects.create(name=name)
+            elevator_system.save()
 
             for i in range(num_elevators):
                 elevator = Elevator(
-                    name=f"Elevator {i + 1} | Elevator System {name} |Created at {current_datetime}",
+                    name=f"Elevator {i + 1} | Elevator System {name} ",
                     elevator_number=i + 1,
+                    elevator_system=elevator_system,
                 )
                 elevator.save()
                 elevators.append(elevator)
@@ -50,14 +52,12 @@ class ElevatorInitializationView(APIView):
             # Create and associate floor instances
             floors = []
             for floor_number in range(floor_numbers):
-                floor = Floor.objects.create(floor_number=floor_number + 1)
+                floor = Floor.objects.create(
+                    floor_number=floor_number + 1, elevator_system=elevator_system
+                )
                 floors.append(floor)
 
-            elevator_system.floors.set(floors)
-            elevator_system.elevators.set(elevators)
-
-            all_elevators = Elevator.objects.all()
-            elevator_serializer = ElevatorSerialzer(elevators, many=True)
+            elevator_serializer = ElevatorSerializer(elevators, many=True)
             floor_serializer = FloorSerializer(floors, many=True)
 
             return Response(
@@ -82,7 +82,7 @@ class ElevatorRequestsView(APIView):
             elevator_number = integer_serializer.validated_data.get('elevator_number')
             elevator_system = integer_serializer.validated_data.get('elevator_system')
             current_elevator = Elevator.objects.get(
-                elevator_number=elevator_number, elevatorsystem=elevator_system
+                elevator_number=elevator_number, elevator_system__id=elevator_system
             )
             all_pending_requests = ElevatorRequest.objects.filter(elevator=current_elevator)
             if not (current_elevator.operational):
@@ -110,7 +110,7 @@ class ElevatorRequestsView(APIView):
             destination_floor = serialized_data.validated_data.get('destination_floor')
             elevator_system = serialized_data.validated_data.get('elevator_system')
             get_elevator = Elevator.objects.get(
-                elevator_number=elevator_number, elevatorsystem=elevator_system
+                elevator_number=elevator_number, elevator_system__id=elevator_system
             )
             if not get_elevator.operational:
                 return Response(
@@ -119,10 +119,10 @@ class ElevatorRequestsView(APIView):
             elevator_request = ElevatorRequest(
                 elevator=get_elevator,
                 from_floor=Floor.objects.get(
-                    floor_number=from_floor, elevatorsystem=elevator_system
+                    floor_number=from_floor, elevator_system__id=elevator_system
                 ),
                 destination_floor=Floor.objects.get(
-                    floor_number=destination_floor, elevatorsystem=elevator_system
+                    floor_number=destination_floor, elevator_system__id=elevator_system
                 ),
             )
             elevator_request.save()
@@ -143,7 +143,7 @@ class ElevatorDoorOpenClose(APIView):
             elevator_system = serializer.validated_data.get('elevator_system')
             door_open_close_request = serializer.validated_data.get('door_open')
             get_elevator = Elevator.objects.get(
-                elevator_number=elevator_number, elevatorsystem=elevator_system
+                elevator_number=elevator_number, elevator_system__id=elevator_system
             )
             if not get_elevator.operational:
                 return Response(
@@ -158,7 +158,7 @@ class ElevatorDoorOpenClose(APIView):
                     get_elevator.door_open = door_open_close_request
                     get_elevator.save()
                     return Response(
-                        ElevatorSerialzer(get_elevator, many=False).data, status=status.HTTP_200_OK
+                        ElevatorSerializer(get_elevator, many=False).data, status=status.HTTP_200_OK
                     )
         else:
             return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
@@ -177,9 +177,9 @@ class ElevatorMaintenanceToggle(APIView):
             elevator_maintenance_request = serializer.validated_data.get(
                 'elevator_maintenance_request'
             )
-            load_distribution_text = "All pending requests have been marked cancelled since there are marked completed since no other elevator is available within this elevator system to fulfill the requests"
+            response_dict = {}
             get_elevator = Elevator.objects.get(
-                elevator_number=elevator_number, elevatorsystem=elevator_system
+                elevator_number=elevator_number, elevator_system__id=elevator_system
             )
             if get_elevator.operational == True and elevator_maintenance_request == False:
                 return Response("Elevator already operational", status=status.HTTP_200_OK)
@@ -188,35 +188,39 @@ class ElevatorMaintenanceToggle(APIView):
             elif get_elevator.operational == True and elevator_maintenance_request == True:
                 get_elevator.operational = not elevator_maintenance_request
                 get_elevator.save()
+
                 # distributing load of the current elevator requests to other elevators if available
-                available_elevators = Elevator.objects.filter(
-                    elevatorsystem=elevator_system, operational=True
+                requests_to_transfer = ElevatorRequest.objects.filter(
+                    elevator__elevator_system__id=elevator_system,
+                    elevator__elevator_number=elevator_number,
                 )
-                if available_elevators.count() > 1:
-                    requests_to_transfer = ElevatorRequest.objects.filter(
-                        elevator__elevatorsystem=elevator_system,
-                        elevator__elevator_number=elevator_number,
+
+                if requests_to_transfer.count() > 1:
+                    available_elevators = Elevator.objects.filter(
+                        elevator_system__id=elevator_system, operational=True
                     )
-                    if requests_to_transfer:
+                    response_dict[
+                        'message'
+                    ] = "All pending requests have been marked cancelled since there are marked completed since no other elevator is available within this elevator system to fulfill the requests."
+
+                    if available_elevators:
                         counter = 0
                         for req in requests_to_transfer:
                             if counter >= available_elevators.count():
                                 counter = 0
                             req.elevator = available_elevators[counter]
-                            print(counter, available_elevators.count())
                             counter = counter + 1
                             req.save()
-                        load_distribution_text = "All available load for this elevator has been transferred to other operational elevators within the same elevator system."
+                        response_dict[
+                            'message'
+                        ] = "All available requests for this elevator has been transferred to other operational elevators within the same elevator system."
 
             else:
                 get_elevator.operational = not elevator_maintenance_request
                 get_elevator.save()
-
+            response_dict['elevator_status'] = ElevatorSerializer(get_elevator, many=False).data
             return Response(
-                {
-                    "note": load_distribution_text,
-                    "elevator_status": ElevatorSerialzer(get_elevator, many=False).data,
-                },
+                response_dict,
                 status=status.HTTP_200_OK,
             )
 
@@ -240,13 +244,14 @@ class FetchNextDestinationFloor(APIView):
                     status=status.HTTP_503_SERVICE_UNAVAILABLE,
                 )
             elevator_flow = get_elevator_flow(elevator_system, elevator_number)
+            print(elevator_flow)
             if elevator_flow:
                 return Response(
                     {
                         'next_destination_floor': elevator_flow[0]
                         if elevator_flow[0]
                         != Elevator.objects.get(
-                            elevatorsystem=elevator_system, elevator_number=elevator_number
+                            elevator_system__id=elevator_system, elevator_number=elevator_number
                         ).current_floor
                         else elevator_flow[1],
                         'elevator_flow_path': elevator_flow,
@@ -275,17 +280,26 @@ class FetchElevatorDirection(APIView):
                     {'error': "Elevator Under Maintenance"},
                     status=status.HTTP_503_SERVICE_UNAVAILABLE,
                 )
-            all_incomplete_requests = fetch_all_incomplete_requests_for_elevator(
-                elevator_system, elevator_number
-            )
-            if all_incomplete_requests:
-                return Response(
-                    {
-                        'direction': "Upwards"
-                        if all_incomplete_requests.first().direction
-                        else "Downwards"
-                    }
-                )
+            # Fetch all incomplete requests for the elevator
+            elevator_flow = get_elevator_flow(elevator_system, elevator_number)
+            if elevator_flow:
+                elevator = Elevator.objects.get(
+                    elevator_system__id=elevator_system, elevator_number=elevator_number
+                ).current_floor
+                # checking if the pickup floor for the next request is above or belo
+                if elevator_flow[0] > elevator:
+                    elevator_direction = "Upwards"
+                elif elevator_flow[0] < elevator:
+                    elevator_direction = "Downwards"
+                # managing when the current floor of the elevator is the same as the first floor of the flow generated
+                # then checking the next floor
+                else:
+                    if elevator_flow[1] > elevator:
+                        elevator_direction = "Upwards"
+                    elif elevator_flow[1] < elevator:
+                        elevator_direction = "Downwards"
+
+                return Response({"direction": elevator_direction, "current_floor": elevator})
             else:
                 return Response(
                     "No direction for the elevator, since the elevator is not moving.",
