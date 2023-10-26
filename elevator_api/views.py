@@ -85,6 +85,10 @@ class ElevatorRequestsView(APIView):
                 elevator_number=elevator_number, elevatorsystem=elevator_system
             )
             all_pending_requests = ElevatorRequest.objects.filter(elevator=current_elevator)
+            if not (current_elevator.operational):
+                return Response(
+                    "Elevator is under maintenance.", status=status.HTTP_503_SERVICE_UNAVAILABLE
+                )
             if all_pending_requests:
                 pending_requests_serializer_data = PendingRequestsSerializer(
                     all_pending_requests, many=True
@@ -92,8 +96,8 @@ class ElevatorRequestsView(APIView):
                 return Response(pending_requests_serializer_data.data)
             else:
                 return Response(
-                    {'error': "No Completed/Pending requests found for this elevator"},
-                    status=status.HTTP_400_BAD_REQUEST,
+                    "No Completed/Pending requests found for this elevator",
+                    status=status.HTTP_204_NO_CONTENT,
                 )
         else:
             return Response(integer_serializer.errors, status=status.HTTP_400_BAD_REQUEST)
@@ -105,10 +109,15 @@ class ElevatorRequestsView(APIView):
             from_floor = serialized_data.validated_data.get('from_floor')
             destination_floor = serialized_data.validated_data.get('destination_floor')
             elevator_system = serialized_data.validated_data.get('elevator_system')
+            get_elevator = Elevator.objects.get(
+                elevator_number=elevator_number, elevatorsystem=elevator_system
+            )
+            if not get_elevator.operational:
+                return Response(
+                    "Elevator is under maintenance", status=status.HTTP_503_SERVICE_UNAVAILABLE
+                )
             elevator_request = ElevatorRequest(
-                elevator=Elevator.objects.get(
-                    elevator_number=elevator_number, elevatorsystem=elevator_system
-                ),
+                elevator=get_elevator,
                 from_floor=Floor.objects.get(
                     floor_number=from_floor, elevatorsystem=elevator_system
                 ),
@@ -137,7 +146,9 @@ class ElevatorDoorOpenClose(APIView):
                 elevator_number=elevator_number, elevatorsystem=elevator_system
             )
             if not get_elevator.operational:
-                return Response("Elevator is under maintenance", status=status.HTTP_200_OK)
+                return Response(
+                    "Elevator is under maintenance", status=status.HTTP_503_SERVICE_UNAVAILABLE
+                )
             else:
                 if get_elevator.door_open == True and door_open_close_request == True:
                     return Response("Door already open", status=status.HTTP_200_OK)
@@ -166,6 +177,7 @@ class ElevatorMaintenanceToggle(APIView):
             elevator_maintenance_request = serializer.validated_data.get(
                 'elevator_maintenance_request'
             )
+            load_distribution_text = "All pending requests have been marked cancelled since there are marked completed since no other elevator is available within this elevator system to fulfill the requests"
             get_elevator = Elevator.objects.get(
                 elevator_number=elevator_number, elevatorsystem=elevator_system
             )
@@ -173,12 +185,40 @@ class ElevatorMaintenanceToggle(APIView):
                 return Response("Elevator already operational", status=status.HTTP_200_OK)
             elif get_elevator.operational == False and elevator_maintenance_request == True:
                 return Response("Elevator already under maintenance", status=status.HTTP_200_OK)
+            elif get_elevator.operational == True and elevator_maintenance_request == True:
+                get_elevator.operational = not elevator_maintenance_request
+                get_elevator.save()
+                # distributing load of the current elevator requests to other elevators if available
+                available_elevators = Elevator.objects.filter(
+                    elevatorsystem=elevator_system, operational=True
+                )
+                if available_elevators.count() > 1:
+                    requests_to_transfer = ElevatorRequest.objects.filter(
+                        elevator__elevatorsystem=elevator_system,
+                        elevator__elevator_number=elevator_number,
+                    )
+                    if requests_to_transfer:
+                        counter = 0
+                        for req in requests_to_transfer:
+                            if counter >= available_elevators.count():
+                                counter = 0
+                            req.elevator = available_elevators[counter]
+                            print(counter, available_elevators.count())
+                            counter = counter + 1
+                            req.save()
+                        load_distribution_text = "All available load for this elevator has been transferred to other operational elevators within the same elevator system."
+
             else:
                 get_elevator.operational = not elevator_maintenance_request
                 get_elevator.save()
-                return Response(
-                    ElevatorSerialzer(get_elevator, many=False).data, status=status.HTTP_200_OK
-                )
+
+            return Response(
+                {
+                    "note": load_distribution_text,
+                    "elevator_status": ElevatorSerialzer(get_elevator, many=False).data,
+                },
+                status=status.HTTP_200_OK,
+            )
 
         else:
             return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
@@ -192,21 +232,30 @@ class FetchNextDestinationFloor(APIView):
     def get(self, request):
         serializer = ElevatorIDSerializer(data=request.data)
         if serializer.is_valid():
-            elevator_id = serializer.validated_data.get('elevator_id')
-            if check_if_elevator_is_under_maintenance(elevator_id):
-                return Response({'error': "Elevator Under Maintenance"})
-            elevator_flow = get_elevator_flow(elevator_id)
+            elevator_system = serializer.validated_data.get('elevator_system')
+            elevator_number = serializer.validated_data.get('elevator_number')
+            if check_if_elevator_is_under_maintenance(elevator_system, elevator_number):
+                return Response(
+                    {'error': "Elevator Under Maintenance"},
+                    status=status.HTTP_503_SERVICE_UNAVAILABLE,
+                )
+            elevator_flow = get_elevator_flow(elevator_system, elevator_number)
             if elevator_flow:
                 return Response(
                     {
                         'next_destination_floor': elevator_flow[0]
-                        if elevator_flow[0] != Elevator.objects.get(id=elevator_id).current_floor
+                        if elevator_flow[0]
+                        != Elevator.objects.get(
+                            elevatorsystem=elevator_system, elevator_number=elevator_number
+                        ).current_floor
                         else elevator_flow[1],
                         'elevator_flow_path': elevator_flow,
                     }
                 )
             else:
-                return Response('No available requests for this elevator')
+                return Response(
+                    'No available requests for this elevator', status=status.HTTP_204_NO_CONTENT
+                )
         else:
             return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
@@ -219,10 +268,16 @@ class FetchElevatorDirection(APIView):
     def get(self, request):
         serializer = ElevatorIDSerializer(data=request.data)
         if serializer.is_valid():
-            elevator_id = serializer.validated_data.get('elevator_id')
-            if check_if_elevator_is_under_maintenance(elevator_id):
-                return Response({'error': "Elevator Under Maintenance"})
-            all_incomplete_requests = fetch_all_incomplete_requests_for_elevator(elevator_id)
+            elevator_system = serializer.validated_data.get('elevator_system')
+            elevator_number = serializer.validated_data.get('elevator_number')
+            if check_if_elevator_is_under_maintenance(elevator_system, elevator_number):
+                return Response(
+                    {'error': "Elevator Under Maintenance"},
+                    status=status.HTTP_503_SERVICE_UNAVAILABLE,
+                )
+            all_incomplete_requests = fetch_all_incomplete_requests_for_elevator(
+                elevator_system, elevator_number
+            )
             if all_incomplete_requests:
                 return Response(
                     {
@@ -232,4 +287,9 @@ class FetchElevatorDirection(APIView):
                     }
                 )
             else:
-                return Response("No direction for the elevator, since the elevator is not moving.")
+                return Response(
+                    "No direction for the elevator, since the elevator is not moving.",
+                    status=status.HTTP_200_OK,
+                )
+        else:
+            return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
