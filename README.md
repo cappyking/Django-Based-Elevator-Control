@@ -6,8 +6,9 @@ By: hemant.cdy@gmail.com
 
 1. About
 2. Milestones Achieved
-3. Project Setup
-4. 
+3. Notes for Developer/Assumptions made
+4. Project Setup
+5. 
 
 ### About
 This repository serves as the backend for an elevator management system, offering an end-to-end solution for various aspects of elevator management. It includes functionalities for initializing elevator systems with custom floors and elevators, managing user requests, handling maintenance, optimizing traffic flow, and planning elevator routes. 
@@ -26,7 +27,7 @@ Additional Features:
 
 ### Notes for Developer/Assumptions made:
 - The project is recommended to be run in a Linux Ubuntu OS.
-- The project was testing in Postman using both FormData and RawJSON.
+- The project was tested in Postman using both FormData and RawJSON and it is recommended that the project is tested there.
 - The project makes an assumption that, on each floor, there will be individual call buttons for each elevator in the system.
 - It is also assumed that the number of floors are to be requested by the user.
 - Lastly, it is assumed that no simulation system was to built to show movement of the lift.
@@ -80,3 +81,4 @@ d. ```python manage.py createsuperuser```: Execute this command to create an adm
 e. ```python manage.py runserver```: Finally, start the development server again to run the project.
 
 
+### 
