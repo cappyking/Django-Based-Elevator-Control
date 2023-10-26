@@ -39,12 +39,23 @@ https://github.com/hkc03/elevator/archive/refs/heads/production.zip
         pip install -r requirements.txt
 
 
-6. Setting up Postgres:
+6. Setting up Postgres: Follow the following commands in sequence
 
         sudo -i -u postgres psql
         CREATE DATABASE personal;
         CREATE USER personal WITH ENCRYPTED PASSWORD '1234';
         \q
-7. Setting up Django:
+7. Setting up Django: 
+Make sure your environment is active and follow the following commands in sequnce:
+
+a. ```python manage.py runserver```: This command will start the development server to ensure everything is running correctly. If the server starts successfully without any errors, you can stop it by pressing Ctrl + C.
+
+b. ```python manage.py makemigrations```: Use this command to create the initial database migrations for the project.
+
+c. ```python manage.py migrate``` : Run this command to apply the database migrations and create the necessary tables in the database.
+
+d. ```python manage.py createsuperuser```: Execute this command to create an admin account that will allow you to access the project's admin panel. Provide a username and password when prompted.
+
+e. ```python manage.py runserver```: Finally, start the development server again to run the project.
 
 
