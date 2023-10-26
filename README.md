@@ -5,11 +5,32 @@ By: hemant.cdy@gmail.com
 ## Content:
 
 1. About
-2. Project Setup
-3. 
+2. Milestones Achieved
+3. Project Setup
+4. 
 
 ### About
 This repository serves as the backend for an elevator management system, offering an end-to-end solution for various aspects of elevator management. It includes functionalities for initializing elevator systems with custom floors and elevators, managing user requests, handling maintenance, optimizing traffic flow, and planning elevator routes. 
+
+### Milestones Achieved:
+- [x]Initialise the elevator system to create ‘n’ elevators in the system
+- [x]Fetch all requests for a given elevator
+- [x]Fetch the next destination floor for a given elevator
+- [x]Fetch if the elevator is moving up or down currently
+- [x]Saves user request to the list of requests for a elevator
+- [x]Mark a elevator as not working or in maintenance 
+- [x]Open/close the door.
+
+Additional Features:
+- In the event that a lift goes under maintenance while other lifts are still operational within the same elevator system, the pending requests of the unavailable elevator shall be evenly distributed among the other elevators.
+
+### Notes for Developer/Assumptions made:
+- The project is recommended to be run in a Linux Ubuntu OS.
+- The project was testing in Postman using both FormData and RawJSON.
+- The project makes an assumption that, on each floor, there will be individual call buttons for each elevator in the system.
+- It is also assumed that the number of floors are to be requested by the user.
+- Lastly, it is assumed that no simulation system was to built to show movement of the lift.
+
 
 ### Project Setup
 
