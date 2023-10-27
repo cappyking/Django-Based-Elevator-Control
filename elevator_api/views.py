@@ -200,10 +200,6 @@ class ElevatorMaintenanceToggle(APIView):
                     available_elevators = Elevator.objects.filter(
                         elevator_system__id=elevator_system, operational=True
                     )
-                    response_dict[
-                        'message'
-                    ] = "All pending requests have been marked cancelled since there are marked completed since no other elevator is available within this elevator system to fulfill the requests."
-
                     if available_elevators:
                         counter = 0
                         for req in requests_to_transfer:
@@ -215,6 +211,13 @@ class ElevatorMaintenanceToggle(APIView):
                         response_dict[
                             'message'
                         ] = "All available requests for this elevator has been transferred to other operational elevators within the same elevator system."
+                    else:
+                        for req in requests_to_transfer:
+                            req.completed = True
+                            req.save()
+                        response_dict[
+                            'message'
+                        ] = "All pending requests have been marked cancelled since there are marked completed since no other elevator is available within this elevator system to fulfill the requests."
 
             else:
                 get_elevator.operational = not elevator_maintenance_request
