@@ -85,7 +85,9 @@ class ElevatorRequestsView(APIView):
             current_elevator = Elevator.objects.get(
                 elevator_number=elevator_number, elevator_system__id=elevator_system
             )
-            all_pending_requests = ElevatorRequest.objects.filter(elevator=current_elevator)
+            all_pending_requests = ElevatorRequest.objects.filter(
+                elevator=current_elevator, completed=False
+            )
             if not (current_elevator.operational):
                 return Response(
                     "Elevator is under maintenance.", status=status.HTTP_503_SERVICE_UNAVAILABLE
