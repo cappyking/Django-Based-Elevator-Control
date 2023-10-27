@@ -81,8 +81,8 @@ DATABASES = {
         'NAME': 'personal',
         'USER': 'personal',
         'PASSWORD': '1234',
-        'HOST': 'localhost',  # Change to your PostgreSQL server's host
-        'PORT': '5432',  # Change to your PostgreSQL server's port
+        'HOST': 'localhost',
+        'PORT': '5432',
     }
 }
 

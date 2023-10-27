@@ -152,3 +152,9 @@ class FloorSerializer(serializers.ModelSerializer):
     class Meta:
         model = Floor
         fields = "__all__"
+
+
+class ElevatorSystemSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = ElevatorSystem
+        fields = "__all__"

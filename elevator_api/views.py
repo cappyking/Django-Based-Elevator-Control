@@ -59,10 +59,11 @@ class ElevatorInitializationView(APIView):
 
             elevator_serializer = ElevatorSerializer(elevators, many=True)
             floor_serializer = FloorSerializer(floors, many=True)
-
+            elevator_system_serializer = ElevatorSystemSerializer(elevator_system, many=False)
             return Response(
                 {
-                    'message': f'{num_elevators} elevators have been initialized on floor 0 and associated with the elevator system: {elevator_system} with {floor_numbers} floors.',
+                    'message': f'{num_elevators} elevators have been initialized on floor 0 with {floor_numbers} floors associated with the elevator system: {elevator_system}',
+                    'elevator_system': elevator_system_serializer.data,
                     'elevators': elevator_serializer.data,
                     "floors": floor_serializer.data,
                 },

@@ -1,0 +1,213 @@
+{
+	"info": {
+		"_postman_id": "1c5e6751-4381-4597-979b-5041e2065559",
+		"name": "Elevator System",
+		"schema": "https://schema.getpostman.com/json/collection/v2.0.0/collection.json",
+		"_exporter_id": "23123143",
+		"_collection_link": "https://www.postman.com/navigation-astronomer-28478585/workspace/assignment/collection/23123143-1c5e6751-4381-4597-979b-5041e2065559?action=share&source=collection_link&creator=23123143"
+	},
+	"item": [
+		{
+			"name": "Initialize ELevator System",
+			"request": {
+				"method": "POST",
+				"header": [],
+				"body": {
+					"mode": "formdata",
+					"formdata": [
+						{
+							"key": "num_elevators",
+							"value": "",
+							"type": "text"
+						},
+						{
+							"key": "floors",
+							"value": "",
+							"type": "text"
+						},
+						{
+							"key": "name",
+							"value": "",
+							"type": "text"
+						}
+					]
+				},
+				"url": "http://localhost:8000/initialize-elevator-system/"
+			},
+			"response": []
+		},
+		{
+			"name": "Elevator Call Button",
+			"request": {
+				"method": "POST",
+				"header": [],
+				"body": {
+					"mode": "formdata",
+					"formdata": [
+						{
+							"key": "elevator_system",
+							"value": "",
+							"type": "text"
+						},
+						{
+							"key": "from_floor",
+							"value": "",
+							"type": "text"
+						},
+						{
+							"key": "destination_floor",
+							"value": "",
+							"type": "text"
+						},
+						{
+							"key": "elevator_number",
+							"value": "",
+							"type": "text"
+						}
+					]
+				},
+				"url": "http://localhost:8000/elevator-requests/"
+			},
+			"response": []
+		},
+		{
+			"name": "Open/Close Elevator Door",
+			"request": {
+				"method": "POST",
+				"header": [],
+				"body": {
+					"mode": "formdata",
+					"formdata": [
+						{
+							"key": "elevator_number",
+							"value": "",
+							"type": "text"
+						},
+						{
+							"key": "door_open",
+							"value": "",
+							"type": "text"
+						},
+						{
+							"key": "elevator_system",
+							"value": "",
+							"type": "text"
+						}
+					]
+				},
+				"url": "http://localhost:8000/toggle-door/"
+			},
+			"response": []
+		},
+		{
+			"name": "Maintenance Switch",
+			"request": {
+				"method": "POST",
+				"header": [],
+				"body": {
+					"mode": "formdata",
+					"formdata": [
+						{
+							"key": "elevator_number",
+							"value": "",
+							"type": "text"
+						},
+						{
+							"key": "elevator_maintenance_request",
+							"value": "",
+							"type": "text"
+						},
+						{
+							"key": "elevator_system",
+							"value": "",
+							"type": "text"
+						}
+					]
+				},
+				"url": "http://localhost:8000/toggle-maintenance/"
+			},
+			"response": []
+		},
+		{
+			"name": "Next Elevator Floor",
+			"protocolProfileBehavior": {
+				"disableBodyPruning": true
+			},
+			"request": {
+				"method": "GET",
+				"header": [],
+				"body": {
+					"mode": "formdata",
+					"formdata": [
+						{
+							"key": "elevator_number",
+							"value": "2",
+							"type": "text"
+						},
+						{
+							"key": "elevator_system",
+							"value": "26",
+							"type": "text"
+						}
+					]
+				},
+				"url": "http://localhost:8000/next-destination/"
+			},
+			"response": []
+		},
+		{
+			"name": "Elevator Direction",
+			"protocolProfileBehavior": {
+				"disableBodyPruning": true
+			},
+			"request": {
+				"method": "GET",
+				"header": [],
+				"body": {
+					"mode": "formdata",
+					"formdata": [
+						{
+							"key": "elevator_system",
+							"value": "",
+							"type": "text"
+						},
+						{
+							"key": "elevator_number",
+							"value": "",
+							"type": "text"
+						}
+					]
+				},
+				"url": "http://localhost:8000/get-direction/"
+			},
+			"response": []
+		},
+		{
+			"name": "View Pending Requests of an Elevator",
+			"protocolProfileBehavior": {
+				"disableBodyPruning": true
+			},
+			"request": {
+				"method": "GET",
+				"header": [],
+				"body": {
+					"mode": "formdata",
+					"formdata": [
+						{
+							"key": "elevator_number",
+							"value": "",
+							"type": "text"
+						},
+						{
+							"key": "elevator_system",
+							"value": "",
+							"type": "text"
+						}
+					]
+				},
+				"url": "http://localhost:8000/elevator-requests/"
+			},
+			"response": []
+		}
+	]
+}
