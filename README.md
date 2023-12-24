@@ -1,6 +1,5 @@
 
-# Elevator Assignment
-By: hemant.cdy@gmail.com
+# Elevator Management System
 
 ## Content:
 
